@@ -5,8 +5,7 @@ services:
     container_name: opensearch
     environment:
       - discovery.type=single-node
-      # 開発向け: セキュリティプラグインを無効化
-      - DISABLE_SECURITY_PLUGIN=true 
+      - DISABLE_SECURITY_PLUGIN=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
       nofile:
@@ -31,29 +30,20 @@ services:
     ports:
       - "5601:5601"
     environment:
-      # OpenSearchサービス名でアクセス
-      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      OPENSEARCH_HOSTS: '["http://localhost:9200"]'
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
-    networks:
-      - log-net
     depends_on:
       opensearch:
         condition: service_healthy
 
   # Fluentd サーバー
   fluentd:
-    build: ./fluentd # `./fluentd/Dockerfile` を参照してビルド
+    build: ./fluentd
     container_name: fluentd
+    network_mode: "host"
     volumes:
-      # 設定ファイルをコンテナにマウント
       - ./fluentd/conf:/fluentd/etc
-      # バッファファイル用のディレクトリ
       - fluentd-buffer:/fluentd/log
-    ports:
-      - "0.0.0.0:24224:24224"       # 明示的に IPv4 を指定
-      - "0.0.0.0:24224:24224/udp"
-    networks:
-      - log-net
     depends_on:
       opensearch:
         condition: service_healthy

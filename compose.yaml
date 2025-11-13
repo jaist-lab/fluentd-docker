@@ -1,0 +1,67 @@
+services:
+  # OpenSearch ノード
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      # 開発向け: セキュリティプラグインを無効化
+      - DISABLE_SECURITY_PLUGIN=true 
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - log-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenSearch Dashboards
+  dashboards:
+    image: opensearchproject/opensearch-dashboards:2.14.0
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      # OpenSearchサービス名でアクセス
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    networks:
+      - log-net
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+  # Fluentd サーバー
+  fluentd:
+    build: ./fluentd # `./fluentd/Dockerfile` を参照してビルド
+    container_name: fluentd
+    volumes:
+      # 設定ファイルをコンテナにマウント
+      - ./fluentd/conf:/fluentd/etc
+      # バッファファイル用のディレクトリ
+      - fluentd-buffer:/fluentd/log
+    ports:
+      - "0.0.0.0:24224:24224"       # 明示的に IPv4 を指定
+      - "0.0.0.0:24224:24224/udp"
+    networks:
+      - log-net
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+volumes:
+  opensearch-data:
+  fluentd-buffer:
+
+networks:
+  log-net:
+    driver: bridge

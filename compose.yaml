@@ -1,4 +1,6 @@
+
 services:
+  # OpenSearch
   opensearch:
     image: opensearchproject/opensearch:${OPENSEARCH_VERSION:-2.11.1}
     container_name: opensearch
@@ -8,8 +10,12 @@ services:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-jaileon02}"
       # セキュリティプラグインを完全に無効化
       - "DISABLE_SECURITY_PLUGIN=true"
+      - "plugins.security.disabled=false"
+      - "plugins.security.ssl.http.enabled=false"
+      - "plugins.security.ssl.transport.enabled=false"
     ulimits:
       memlock:
         soft: -1
@@ -30,3 +36,66 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  # OpenSearch Dashboards
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:${OPENSEARCH_VERSION:-2.11.1}
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=false"
+    volumes:
+      - ./opensearch-dashboards/config/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
+    networks:
+      - logging-network
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Fluentd
+  fluentd:
+    build: ./fluentd
+    container_name: fluentd
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./fluentd/conf:/fluentd/etc:ro
+      - fluentd-buffer:/fluentd/buffer
+      - fluentd-failed:/fluentd/failed
+    networks:
+      - logging-network
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep fluentd || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  opensearch-data:
+    driver: local
+  fluentd-buffer:
+    driver: local
+  fluentd-failed:
+    driver: local
+
+networks:
+  logging-network:
+    driver: bridge
+    # Podman 用の追加設定
+    driver_opts:
+      com.docker.network.bridge.name: logging-network

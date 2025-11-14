@@ -2,12 +2,9 @@ server.host: "0.0.0.0"
 server.port: 5601
 
 opensearch.hosts: ["http://opensearch:9200"]
-opensearch.username: "admin"
-opensearch.password: "jaileon02"
 
-# セキュリティ設定（認証なし環境）
-opensearch_security.auth.type: "basicauth"
-opensearch_security.cookie.secure: false
+# セキュリティを完全に無効化
+opensearch_security.enabled: false
 
 # 多言語対応
 i18n.locale: "ja-JP"

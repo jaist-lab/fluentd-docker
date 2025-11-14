@@ -1,64 +1,98 @@
+version: '3.8'
+
 services:
-  # OpenSearch ノード
+  # OpenSearch
   opensearch:
-    image: opensearchproject/opensearch:2.14.0
+    image: opensearchproject/opensearch:${OPENSEARCH_VERSION:-2.11.1}
     container_name: opensearch
     environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1
       - discovery.type=single-node
-      - DISABLE_SECURITY_PLUGIN=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
-      # HTTP リクエストサイズの上限を増やす
-      - "http.max_content_length=100mb"
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-jaileon02}"
+      - "DISABLE_SECURITY_PLUGIN=false"
+      - "plugins.security.disabled=false"
+      - "plugins.security.ssl.http.enabled=false"
+      - "plugins.security.ssl.transport.enabled=false"
     ulimits:
+      memlock:
+        soft: -1
+        hard: -1
       nofile:
         soft: 65536
         hard: 65536
-    ports:
-      - "9200:9200"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
     networks:
-      - log-net
+      - logging-network
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
       retries: 5
 
   # OpenSearch Dashboards
-  dashboards:
-    image: opensearchproject/opensearch-dashboards:2.14.0
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:${OPENSEARCH_VERSION:-2.11.1}
     container_name: opensearch-dashboards
     ports:
       - "5601:5601"
     environment:
-      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
-      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=false"
+    volumes:
+      - ./opensearch-dashboards/config/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
     networks:
-      - log-net
+      - logging-network
     depends_on:
       opensearch:
         condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  # Fluentd サーバー
+  # Fluentd
   fluentd:
     build: ./fluentd
     container_name: fluentd
-    # extra_hosts でホストの localhost を OpenSearch に解決
-    extra_hosts:
-      - "opensearch:172.16.100.200"
-    network_mode: "host"
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
     volumes:
-      - ./fluentd/conf:/fluentd/etc
-      - fluentd-buffer:/fluentd/log
+      - ./fluentd/conf:/fluentd/etc:ro
+      - fluentd-buffer:/fluentd/buffer
+      - fluentd-failed:/fluentd/failed
+    networks:
+      - logging-network
     depends_on:
       opensearch:
         condition: service_healthy
+    restart: unless-stopped
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep fluentd || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   opensearch-data:
+    driver: local
   fluentd-buffer:
+    driver: local
+  fluentd-failed:
+    driver: local
 
 networks:
-  log-net:
+  logging-network:
     driver: bridge

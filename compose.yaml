@@ -12,7 +12,7 @@ services:
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}"
       - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-jaileon02}"
-      - "DISABLE_SECURITY_PLUGIN=false"
+      - "DISABLE_SECURITY_PLUGIN=true"
       - "plugins.security.disabled=false"
       - "plugins.security.ssl.http.enabled=false"
       - "plugins.security.ssl.transport.enabled=false"

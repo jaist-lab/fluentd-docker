@@ -3,8 +3,6 @@ server.port: 5601
 
 opensearch.hosts: ["http://opensearch:9200"]
 
-# セキュリティを無効化
 opensearch_security.enabled: false
 
-# 多言語対応
 i18n.locale: "ja-JP"

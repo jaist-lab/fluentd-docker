@@ -10,7 +10,6 @@ services:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
       - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
-      # セキュリティプラグインを完全に無効化
       - DISABLE_SECURITY_PLUGIN=true
       - DISABLE_INSTALL_DEMO_CONFIG=true
     ulimits:
@@ -34,7 +33,6 @@ services:
       - "5601:5601"
     environment:
       - OPENSEARCH_HOSTS=["http://opensearch:9200"]
-      # Dashboards のセキュリティも無効化
       - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
     volumes:
       - ./opensearch-dashboards/config/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
